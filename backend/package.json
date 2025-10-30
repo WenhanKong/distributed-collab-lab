@@ -1,0 +1,30 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "clean": "rm -rf dist && find src -type f \\( -name '*.js' -o -name '*.d.ts' -o -name '*.js.map' -o -name '*.ts.map' \\) -delete",
+    "clean:all": "rm -rf dist/ node_modules/ package-lock.json"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@hocuspocus/server": "^3.4.0",
+    "@hocuspocus/extension-database": "^3.4.0",
+    "@hocuspocus/extension-logger": "^3.4.0",
+    "dotenv": "^17.2.3",
+    "yjs": "^13.6.27"
+  },
+  "devDependencies": {
+    "@types/node": "^24.9.1",
+    "tsx": "^4.19.0",
+    "typescript": "^5.9.3"
+  }
+}
