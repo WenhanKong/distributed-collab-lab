@@ -1,120 +1,55 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
+
 import './App.css'
-import { DocumentEditor } from './components/DocumentEditor'
-import { HocuspocusProvider } from '@hocuspocus/provider'
-import * as Y from 'yjs'
+import type { CollabUser } from './collab/CollabProvider'
+import { Lobby } from './pages/Lobby'
+import { RoomShell } from './pages/RoomShell'
 
 const colors = ['#958DF1', '#F98181', '#FBBC88', '#FAF594', '#70CFF8', '#94FADB', '#B9F18D']
-const names = ['Alice', 'Bob', 'Charlie', 'Diana', 'Eve', 'Frank', 'Grace']
+const displayNames = ['Ada', 'Grace', 'Linus', 'Matz', 'Edsger', 'Radia', 'Marissa', 'Nadia']
 
-const getRandomElement = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)]
+const pickColor = () => colors[Math.floor(Math.random() * colors.length)]
+const pickName = () => displayNames[Math.floor(Math.random() * displayNames.length)]
+
+const createUser = (name: string): CollabUser => ({
+  id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
+  name,
+  color: pickColor(),
+})
 
 function App() {
-  // Generate random users once - like official demo
-  const user1 = useMemo(() => ({
-    name: getRandomElement(names),
-    color: getRandomElement(colors),
-  }), [])
+  const [room, setRoom] = useState<string | null>(null)
+  const [user, setUser] = useState<CollabUser | null>(null)
+  const [lastRoom, setLastRoom] = useState('workspace')
+  const [lastName, setLastName] = useState(() => pickName())
 
-  const user2 = useMemo(() => ({
-    name: getRandomElement(names),
-    color: getRandomElement(colors),
-  }), [])
+  const serverUrl = useMemo(() => 'ws://localhost:3000', [])
+  const signalingUrls = useMemo(() => ['wss://signaling.yjs.dev'], [])
 
-  // Create shared Y.Doc and provider
-  const ydoc1 = useMemo(() => new Y.Doc(), [])
-  const ydoc2 = useMemo(() => new Y.Doc(), [])
+  const handleJoin = (roomName: string, displayName: string) => {
+    setLastRoom(roomName)
+    setLastName(displayName)
+    setRoom(roomName)
+    setUser(createUser(displayName))
+  }
 
-  const provider1 = useMemo(() => {
-    return new HocuspocusProvider({
-      url: 'ws://localhost:3000',
-      name: 'workspace',
-      document: ydoc1,
-    })
-  }, [ydoc1])
+  const handleLeave = () => {
+    setRoom(null)
+    setUser(null)
+  }
 
-  const provider2 = useMemo(() => {
-    return new HocuspocusProvider({
-      url: 'ws://localhost:3000',
-      name: 'workspace',
-      document: ydoc2,
-    })
-    }, [ydoc2])
-  
+  if (!room || !user) {
+    return <Lobby onJoin={handleJoin} defaultRoom={lastRoom} defaultName={lastName} />
+  }
+
   return (
-    <div style={{ 
-      height: '100vh', 
-      display: 'flex', 
-      flexDirection: 'column',
-      fontFamily: 'system-ui',
-      background: '#f3f4f6'
-    }}>
-      <header style={{ 
-        padding: '16px 24px', 
-        background: 'white', 
-        borderBottom: '1px solid #e5e7eb',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-      }}>
-        <h1 style={{ margin: 0, fontSize: '20px', fontWeight: '600' }}>
-          Collaborative Editor Demo
-        </h1>
-      </header>
-
-      <div style={{ 
-        flex: 1, 
-        display: 'flex', 
-        gap: '1px', 
-        background: '#e5e7eb',
-        overflow: 'hidden'
-      }}>
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'white' }}>
-          <div style={{ 
-            padding: '12px 16px', 
-            background: '#f9fafb', 
-            borderBottom: '1px solid #e5e7eb',
-            fontWeight: '600',
-            fontSize: '14px'
-          }}>
-            Editor 1 - {user1.name}
-          </div>
-          <DocumentEditor 
-            userName={user1.name} 
-            userColor={user1.color}
-            ydoc={ydoc1}
-            provider={provider1}
-          />
-        </div>
-        
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'white' }}>
-          <div style={{ 
-            padding: '12px 16px', 
-            background: '#f9fafb', 
-            borderBottom: '1px solid #e5e7eb',
-            fontWeight: '600',
-            fontSize: '14px'
-          }}>
-            Editor 2 - {user2.name}
-          </div>
-          <DocumentEditor 
-            userName={user2.name} 
-            userColor={user2.color}
-            ydoc={ydoc2}
-            provider={provider2}
-          />
-        </div>
-      </div>
-
-      <footer style={{
-        padding: '12px 24px',
-        background: 'white',
-        borderTop: '1px solid #e5e7eb',
-        fontSize: '13px',
-        color: '#6b7280',
-        textAlign: 'center'
-      }}>
-        💡 Open this in multiple browser windows to see real-time collaboration!
-      </footer>
-    </div>
+    <RoomShell
+      room={room}
+      user={user}
+      serverUrl={serverUrl}
+      signalingUrls={signalingUrls}
+      onLeave={handleLeave}
+    />
   )
 }
 
