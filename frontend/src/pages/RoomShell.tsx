@@ -35,7 +35,7 @@ export function RoomShell({ room, user, serverUrl, signalingUrls, onLeave }: Roo
         user,
         serverUrl,
         signalingUrls,
-        enableWebRTC: false,
+        enableWebRTC: true,
     })
 
     const { doc, awareness, status, synced, transports, provider } = collab
