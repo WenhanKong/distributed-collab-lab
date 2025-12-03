@@ -10,7 +10,7 @@ import CharacterCount from '@tiptap/extension-character-count'
 import Placeholder from '@tiptap/extension-placeholder'
 import StarterKit from '@tiptap/starter-kit'
 import { TaskItem, TaskList } from '@tiptap/extension-list'
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 
 import type { ProviderStatus } from '../collab/CollabProvider'
 
@@ -24,9 +24,10 @@ interface DocumentEditorProps {
         name: string
         color: string
     }
+    canEdit?: boolean
 }
 
-export function DocumentEditor({ doc, awareness, status, synced, user }: DocumentEditorProps) {
+export function DocumentEditor({ doc, awareness, status, synced, user, canEdit = true }: DocumentEditorProps) {
     const { label, indicator } = useMemo(() => {
         if (status === 'connected' && synced) {
             return { label: 'synced', indicator: '#10b981' }
@@ -44,6 +45,7 @@ export function DocumentEditor({ doc, awareness, status, synced, user }: Documen
     }, [status, synced])
 
     const editor = useEditor({
+        editable: canEdit,
         extensions: [
             StarterKit.configure({ undoRedo: false }),
             Highlight,
@@ -63,6 +65,13 @@ export function DocumentEditor({ doc, awareness, status, synced, user }: Documen
             }),
         ],
     })
+
+    useEffect(() => {
+        if (!editor) {
+            return
+        }
+        editor.setEditable(canEdit)
+    }, [editor, canEdit])
 
     if (!editor) {
         return (
@@ -163,7 +172,8 @@ export function DocumentEditor({ doc, awareness, status, synced, user }: Documen
                 </ToolbarButton>
             </div>
 
-            <div className="editor__body">
+            <div className={`editor__body ${canEdit ? '' : 'editor__body--disabled'}`}>
+                {!canEdit ? <div className="editor__lockNotice">Request the edit lock to make changes.</div> : null}
                 <EditorContent editor={editor} />
             </div>
 

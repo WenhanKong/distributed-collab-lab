@@ -40,13 +40,13 @@ export class WebRTCTransport implements CollabTransport {
 			password: options.password,
 			maxConns: options.maxConns,
 			connect: false,
-		})
+		} as any)
 
 		// Ensure lifecycle stays caller-controlled.
 		this.provider.disconnect()
 		this.setStatus('disconnected')
 
-		this.provider.on('status', this.statusHandler)
+		this.provider.on('status', this.statusHandler as any)
 	}
 
 	static create(options: Omit<WebRTCTransportOptions, keyof CollabTransportConfig>): (config: CollabTransportConfig) => WebRTCTransport {
@@ -78,7 +78,7 @@ export class WebRTCTransport implements CollabTransport {
 	}
 
 	destroy(): void {
-		this.provider.off('status', this.statusHandler)
+		this.provider.off('status', this.statusHandler as any)
 		this.provider.destroy()
 		this.statusEmitter.clear()
 		this.status = 'disconnected'

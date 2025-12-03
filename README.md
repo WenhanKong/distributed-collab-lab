@@ -14,6 +14,22 @@ This is **NOT** a production application - it's a **learning playground** for di
 
 ---
 
+## ✅ Distributed Systems Requirements Covered
+
+| Requirement | Where it Appears | Notes |
+| ----------- | ---------------- | ----- |
+| **Replication & Consistency Protocols** | Yjs + Hocuspocus CRDT sync (`frontend/src/collab`) | The shared document, chat, agenda, and mutex queues replicate through Yjs CRDT semantics, satisfying the replication/consistency requirement. |
+| **Leader Election** | Awareness-powered bully algorithm (`useLeaderElectionState`) | The client with the highest live awareness ID becomes coordinator; leader identity is surfaced beside Collaborators and gates privileged actions. |
+| **Mutual Exclusion / Concurrency Control** | Lamport-style mutex queue (`useDocumentMutex`, Agenda lock) | Editing the document requires acquiring a shared Y.Array-backed lock; leaders can also reset stale locks. |
+
+These features are not just UI demos—they drive real behavior:
+
+- **Leader-only actions:** Only the elected coordinator can toggle agenda completion and certain room controls.
+- **Mutex-enforced editing:** TipTap becomes read-only until you acquire the distributed lock, preventing concurrent writes.
+- **Replication:** All of the above synchronize across peers thanks to the underlying CRDT protocol.
+
+---
+
 ## 🏗️ Architecture Overview
 
 ```
@@ -55,32 +71,31 @@ This is **NOT** a production application - it's a **learning playground** for di
 
 ## 🧩 Three Learning Vehicles
 
-Each feature demonstrates a different CRDT data structure:
+Each feature demonstrates a different distributed-systems primitive layered on top of Yjs shared types:
 
-### 1. 📝 Document Editor (Y.Text)
-**Status**: ⏳ In Progress  
-**CRDT Type**: `Y.Text` - collaborative string/rich-text  
-**Learning Goals**:
-- Text insertion/deletion with position tracking
-- Formatting (bold, italic, etc.) as metadata
-- Cursor positions and selections (awareness)
-- Undo/redo with collaborative history
+### 1. 📝 Document Editor (Y.Text + Mutex)
+**Status**: ✅ Functional  
+**Focus**: CRDT replication *and* mutual exclusion  
+**Highlights**:
+- Y.Text handles collaborative rich text and formatting.
+- A Lamport-style mutex queue (stored in the doc) gates edit access; non-owners see the editor in read-only mode.
+- Leaders can reset stale locks to recover from crashed peers.
 
-### 2. 💬 Chat (Y.Array)
-**Status**: ❌ Not Started  
-**CRDT Type**: `Y.Array` - append-only log  
-**Learning Goals**:
-- Timestamp-based ordering
-- Append operations (never delete/reorder)
-- Message integrity in distributed environment
+### 2. 📋 Agenda (Y.Array + Leader Election)
+**Status**: ✅ Functional  
+**Focus**: Leader-governed state changes  
+**Highlights**:
+- Agenda items live in a shared Y.Array so they replicate instantly.
+- Only the elected leader may toggle completion status, proving the coordinator role drives real behavior.
+- Every client can add/remove items, but completion reflects leader authority.
 
-### 3. 📅 Calendar (Y.Map)
-**Status**: ❌ Not Started  
-**CRDT Type**: `Y.Map` - key-value store  
-**Learning Goals**:
-- Last-write-wins semantics
-- Concurrent updates to different keys
-- Conflict resolution strategies for same-key updates
+### 3. 💬 Chat (Y.Array)
+**Status**: ✅ Functional  
+**Focus**: Append-only CRDT logs & ordering strategies  
+**Highlights**:
+- Messages are appended to a replicated Y.Array so ordering is retained even with concurrent writes.
+- Awareness enrichment tags each entry with user identity and local/remote metadata.
+- Demonstrates compatibility between CRDT state and imperative UI (scrollback, optimistic sends).
 
 ---
 
@@ -341,33 +356,49 @@ npm install yjs @hocuspocus/provider
 
 ---
 
-## 🗺️ Roadmap
+## 🗺️ Roadmap (Completed)
 
-### Phase 1: Document Editor ✅ → ⏳
-- [x] Basic TipTap setup
-- [x] Yjs text synchronization
-- [x] Connection status indicator
-- [x] Toolbar with formatting
-- [ ] **Collaboration cursors** (current blocker)
-- [ ] File persistence (backend)
-- [ ] IndexedDB persistence (frontend)
+### Phase 1: Collaborative Workspace Foundations ✅
+- TipTap + Yjs document editor
+- Awareness-driven presence & bully-style leader election
+- Lamport mutex guarding the editor with reset path
+- Agenda Y.Array with leader-only completion toggles
+- IndexedDB warm start for offline edits
+- Backed by Hocuspocus WebSocket relay, ready for persistence experiments
 
-### Phase 2: Chat (Not Started)
-- [ ] Y.Array setup
-- [ ] Message list component
-- [ ] Real-time message sync
-- [ ] User identification
-- [ ] Timestamp handling
+### Phase 2: Realtime Chat ✅
+- Shared Y.Array log, awareness-enriched messages, optimistic sends
+- Manual verification steps documented in README
 
-### Phase 3: Calendar (Not Started)
-- [ ] Y.Map setup
-- [ ] Event CRUD operations
-- [ ] Conflict resolution testing
-- [ ] Multi-user event editing
+### Phase 3: Distributed Algorithm Experiments ✅
+- Leader election surfaced in UI and gating privileged actions
+- Mutex queue ensuring concurrency control for document edits
+- CRDT replication across all collaborative state
 
-### Phase 4: Deep Dive (Future)
-- [ ] Implement custom CRDT from scratch
-- [ ] Compare performance with Yjs
-- [ ] Document CRDT internals learned
+### Future Explorations (Optional)
+- Compare Yjs-based replication with DIY CRDTs
+- Introduce gossip/signaling alternatives or distributed snapshots if desired
+
+---
+
+## 🔬 Verifying the Distributed Algorithms
+
+1. **Start the app** (`npm run dev` in both `backend/` and `frontend/`), then join the same room in two browser tabs.
+2. **Leader Election**: look at the Collaborators card—one name will have a “Leader” badge. Close that tab and watch leadership transfer automatically to the remaining client.
+3. **Mutual Exclusion**: try typing in the editor without holding the lock—you’ll see a banner telling you to request it. Click “Request lock,” make edits, then “Release lock.” Other tabs can only edit once the lock is free.
+4. **Replication & Consistency**: add agenda items or chat messages in one tab and observe the other tab update instantly; even after refreshing, state replays thanks to Yjs/IndexedDB persistence.
+
+These manual steps double as acceptance criteria whenever you modify the collaboration stack.
+
+---
+## 🧠 Distributed Algorithm Experiments
+
+To cover more distributed-systems topics, the frontend now includes:
+
+1. **Leader Election (Bully-style)** – Each connected client emits heartbeats through Yjs Awareness. The client with the highest `clientId` and a fresh heartbeat becomes coordinator. This satisfies the “Leader Election” requirement. See `useLeaderElectionState` and `src/collab/algorithms/leaderElection.ts`.
+2. **Mutex / Concurrency Control** – A Lamport-inspired queue stored in the shared doc (`mutex:document`) enforces exclusive edit access. Users must acquire the lock before TipTap becomes editable. This satisfies the “Mutual Exclusion / Concurrency Control” requirement. Implementation lives in `useDocumentMutex` with visualization inside `RoomShell`.
+3. **Replication & Consistency via CRDTs** – All collaborative state (doc, chat, agenda, lock queues) is replicated through Yjs CRDT semantics over Hocuspocus WebSockets, fulfilling the “Replication and Consistency Protocols” requirement. Core wiring is in `frontend/src/collab`.
+
+Both algorithms have unit tests (run `npm run test:algorithms` inside `frontend/`) that prove deterministic tie-breaking and queue ordering even when nodes fail or rejoin. Refer to `frontend/tests/*.test.ts` for documented state transitions.
 
 ---

@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 
 import type { CollabUser } from '../collab/CollabProvider'
 import { useCollabProvider } from '../collab/useCollabProvider'
@@ -10,6 +10,8 @@ import { ChatPanel } from '../components/ChatPanel'
 import type { AgendaItem } from '../components/AgendaPanel'
 import { AgendaPanel } from '../components/AgendaPanel'
 import { useIndexedDbCache } from '../collab/persistence/useIndexedDbCache'
+import { useLeaderElectionState } from '../collab/hooks/useLeaderElection'
+import { useDocumentMutex } from '../collab/hooks/useDocumentMutex'
 
 interface RoomShellProps {
     room: string
@@ -36,7 +38,7 @@ export function RoomShell({ room, user, serverUrl, signalingUrls, onLeave }: Roo
         enableWebRTC: false,
     })
 
-    const { doc, awareness, status, synced, transports } = collab
+    const { doc, awareness, status, synced, transports, provider } = collab
 
     const cache = useIndexedDbCache(room, doc, { enabled: true })
 
@@ -45,6 +47,21 @@ export function RoomShell({ room, user, serverUrl, signalingUrls, onLeave }: Roo
 
     const localPresence = useMemo(() => ({ status, user }), [status, user])
     const presence = useAwareness(awareness, localPresence)
+    const leadership = useLeaderElectionState(presence, awareness.clientID)
+    const documentMutex = useDocumentMutex(doc, 'document', user)
+
+    useEffect(() => {
+        if (!provider) {
+            return undefined
+        }
+        provider.updatePresence({ heartbeat: Date.now() })
+        const interval = setInterval(() => {
+            provider.updatePresence({ heartbeat: Date.now() })
+        }, 3000)
+        return () => {
+            clearInterval(interval)
+        }
+    }, [provider])
 
     return (
         <div className="roomShell">
@@ -73,12 +90,23 @@ export function RoomShell({ room, user, serverUrl, signalingUrls, onLeave }: Roo
 
             <div className="roomShell__content">
                 <div className="roomShell__editor">
-                    <DocumentEditor doc={doc} awareness={awareness} status={status} synced={synced} user={user} />
+                    <DocumentEditor
+                        doc={doc}
+                        awareness={awareness}
+                        status={status}
+                        synced={synced}
+                        user={user}
+                        canEdit={documentMutex.canEdit}
+                    />
                 </div>
                 <aside className="roomShell__sidebar">
                     <section className="roomShell__panel">
                         <h2 className="roomShell__panelTitle">Collaborators</h2>
-                        <PresenceList presences={presence} localClientId={awareness.clientID} />
+                        <PresenceList
+                            presences={presence}
+                            localClientId={awareness.clientID}
+                            leaderUserId={leadership.leader?.userId}
+                        />
                     </section>
                     <section className="roomShell__panel">
                         <h2 className="roomShell__panelTitle">Chat</h2>
@@ -86,7 +114,39 @@ export function RoomShell({ room, user, serverUrl, signalingUrls, onLeave }: Roo
                     </section>
                     <section className="roomShell__panel">
                         <h2 className="roomShell__panelTitle">Agenda</h2>
-                        <AgendaPanel agenda={agenda} user={user} />
+                        <AgendaPanel agenda={agenda} user={user} canToggle={leadership.isLeader} />
+                    </section>
+                    <section className="roomShell__panel">
+                        <h2 className="roomShell__panelTitle">Document Lock</h2>
+                        <p className="roomShell__text">
+                            Owner: {documentMutex.ownerName ?? 'Unassigned'}
+                        </p>
+                        <div className="mutexControls">
+                            <button
+                                type="button"
+                                onClick={documentMutex.requestLock}
+                                disabled={documentMutex.hasLock || documentMutex.isQueued}
+                            >
+                                Request lock
+                            </button>
+                            <button
+                                type="button"
+                                onClick={documentMutex.releaseLock}
+                                disabled={!documentMutex.hasLock}
+                            >
+                                Release lock
+                            </button>
+                            <button type="button" onClick={documentMutex.resetLock}>
+                                Reset (Debug)
+                            </button>
+                        </div>
+                        <ol className="mutexQueue">
+                            {documentMutex.queue.map((request) => (
+                                <li key={`${request.clientId}-${request.timestamp}`}>
+                                    {request.name} · {new Date(request.timestamp).toLocaleTimeString()}
+                                </li>
+                            ))}
+                        </ol>
                     </section>
                 </aside>
             </div>

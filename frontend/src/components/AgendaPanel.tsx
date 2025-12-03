@@ -21,9 +21,10 @@ interface AgendaPanelProps {
     name: string
     color: string
   }
+  canToggle?: boolean
 }
 
-export function AgendaPanel({ agenda, user }: AgendaPanelProps) {
+export function AgendaPanel({ agenda, user, canToggle = true }: AgendaPanelProps) {
   const [draft, setDraft] = useState('')
   const [items, setItems] = useState<AgendaItem[]>(() => agenda.toArray())
 
@@ -61,6 +62,9 @@ export function AgendaPanel({ agenda, user }: AgendaPanelProps) {
   }
 
   const toggleItem = (id: string, completed: boolean) => {
+    if (!canToggle) {
+      return
+    }
     const index = items.findIndex((item) => item.id === id)
     if (index === -1) {
       return
@@ -104,6 +108,7 @@ export function AgendaPanel({ agenda, user }: AgendaPanelProps) {
                 type="checkbox"
                 checked={item.completed}
                 onChange={() => toggleItem(item.id, item.completed)}
+                disabled={!canToggle}
               />
               <span className={`agendaPanel__text ${item.completed ? 'agendaPanel__text--completed' : ''}`}>
                 {item.text}

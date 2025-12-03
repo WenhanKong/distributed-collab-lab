@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react'
 import type { Awareness } from 'y-protocols/awareness'
 
 export interface AwarenessState<T> {
@@ -10,18 +10,33 @@ export function useAwareness<T extends Record<string, unknown>>(
 	awareness: Awareness,
 	localState?: Partial<T>,
 ) {
+	const snapshotRef = useRef<AwarenessState<T>[]>([])
+
+	const computeSnapshot = useCallback(() => {
+		return Array.from(awareness.getStates().entries())
+			.map(([clientId, state]) => ({
+				clientId,
+				state: state as T,
+			}))
+			.sort((a, b) => a.clientId - b.clientId)
+	}, [awareness])
+
 	const subscribe = useCallback(
 		(listener: () => void) => {
-			const handler = () => listener()
+			const handler = () => {
+				snapshotRef.current = computeSnapshot()
+				listener()
+			}
+			snapshotRef.current = computeSnapshot()
 			awareness.on('update', handler)
 			return () => {
 				awareness.off('update', handler)
 			}
 		},
-		[awareness],
+		[awareness, computeSnapshot],
 	)
 
-	const getSnapshot = useCallback(() => awareness.getStates(), [awareness])
+	const getSnapshot = useCallback(() => snapshotRef.current, [])
 
 		useEffect(() => {
 			if (!localState) {
@@ -42,16 +57,7 @@ export function useAwareness<T extends Record<string, unknown>>(
 			}
 		}, [awareness])
 
-			const store = useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
+			const snapshot = useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
 
-			return useMemo(
-				() =>
-					Array.from(store.entries())
-						.map(([clientId, state]) => ({
-							clientId,
-							state: state as T,
-						}))
-						.sort((a, b) => a.clientId - b.clientId),
-				[store],
-			)
+			return useMemo(() => snapshot, [snapshot])
 	}

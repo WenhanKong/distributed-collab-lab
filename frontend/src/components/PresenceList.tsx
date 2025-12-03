@@ -13,9 +13,10 @@ interface PresencePayload {
 interface PresenceListProps {
   presences: AwarenessState<PresencePayload>[]
   localClientId: number
+  leaderUserId?: string
 }
 
-export function PresenceList({ presences, localClientId }: PresenceListProps) {
+export function PresenceList({ presences, localClientId, leaderUserId }: PresenceListProps) {
   if (!presences.length) {
     return (
       <div className="presenceList">
@@ -42,6 +43,7 @@ export function PresenceList({ presences, localClientId }: PresenceListProps) {
               <span className="presenceList__name">
                 {user?.name ?? 'Anonymous'}
                 {isLocal ? ' (You)' : ''}
+                { user?.id && user.id === leaderUserId ? <span className="presenceList__badge">Leader</span> : null}
               </span>
               <span className="presenceList__status">
                 {state.status ?? 'online'}

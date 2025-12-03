@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:algorithms": "tsc -p tsconfig.tests.json && node -e \"const fs=require('fs');const path=require('path');const dir=path.join(process.cwd(), '.tests-dist');fs.mkdirSync(dir,{recursive:true});fs.writeFileSync(path.join(dir,'package.json'), JSON.stringify({type:'commonjs'}));\" && node --test ./.tests-dist/tests"
   },
   "dependencies": {
     "@hocuspocus/provider": "^3.4.0",
