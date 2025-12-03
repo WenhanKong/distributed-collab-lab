@@ -16,7 +16,16 @@ export interface DocumentMutexState {
 	resetLock: () => void
 }
 
-export function useDocumentMutex(doc: Y.Doc, resourceId: string, user: CollabUser): DocumentMutexState {
+interface DocumentMutexOptions {
+	allowReset?: boolean
+}
+
+export function useDocumentMutex(
+	doc: Y.Doc,
+	resourceId: string,
+	user: CollabUser,
+	options?: DocumentMutexOptions,
+): DocumentMutexState {
 	const queue = useMemo(() => doc.getArray<MutexRequest>(`mutex:${resourceId}`), [doc, resourceId])
 	const [requests, setRequests] = useState<MutexRequest[]>(() => queue.toArray())
 
@@ -74,6 +83,11 @@ export function useDocumentMutex(doc: Y.Doc, resourceId: string, user: CollabUse
 		ownerName,
 		requestLock: enqueue,
 		releaseLock: dequeue,
-		resetLock: () => queue.delete(0, queue.length),
+		resetLock: () => {
+			if (options?.allowReset !== true) {
+				return
+			}
+			queue.delete(0, queue.length)
+		},
 	}
 }

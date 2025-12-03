@@ -48,7 +48,7 @@ export function RoomShell({ room, user, serverUrl, signalingUrls, onLeave }: Roo
     const localPresence = useMemo(() => ({ status, user }), [status, user])
     const presence = useAwareness(awareness, localPresence)
     const leadership = useLeaderElectionState(presence, awareness.clientID)
-    const documentMutex = useDocumentMutex(doc, 'document', user)
+    const documentMutex = useDocumentMutex(doc, 'document', user, { allowReset: leadership.isLeader })
 
     useEffect(() => {
         if (!provider) {
@@ -136,8 +136,17 @@ export function RoomShell({ room, user, serverUrl, signalingUrls, onLeave }: Roo
                             >
                                 Release lock
                             </button>
-                            <button type="button" onClick={documentMutex.resetLock}>
-                                Reset (Debug)
+                            <button
+                                type="button"
+                                onClick={documentMutex.resetLock}
+                                disabled={!leadership.isLeader}
+                                title={
+                                    leadership.isLeader
+                                        ? 'Leader can clear stale locks'
+                                        : 'Only the leader may reset the lock'
+                                }
+                            >
+                                Reset lock
                             </button>
                         </div>
                         <ol className="mutexQueue">
