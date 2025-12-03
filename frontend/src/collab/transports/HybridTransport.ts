@@ -1,5 +1,11 @@
 import { SimpleEmitter } from '../utils/emitter'
-import type { CollabTransport, CollabTransportConfig, CollabTransportFactory, TransportStatus } from '../types'
+import type {
+	CollabTransport,
+	CollabTransportConfig,
+	CollabTransportFactory,
+	TransportKind,
+	TransportStatus,
+} from '../types'
 import { HocuspocusTransport } from './HocuspocusTransport'
 import { WebRTCTransport } from './WebRTCTransport'
 
@@ -20,6 +26,7 @@ export class HybridTransport implements CollabTransport {
 	private statusEmitter = new SimpleEmitter<TransportStatus>()
 	private syncedEmitter = new SimpleEmitter<void>()
 	private unsubscribers: Array<() => void> = []
+	private webrtcFallbackTimer: ReturnType<typeof setTimeout> | null = null
 
 	constructor(config: CollabTransportConfig, options: HybridTransportOptions) {
 		this.hocuspocus = new HocuspocusTransport({
@@ -41,7 +48,12 @@ export class HybridTransport implements CollabTransport {
 				signaling: options.signaling,
 				maxConns: options.maxConns,
 			})
-			this.unsubscribers.push(this.webrtc.subscribeStatus(() => this.updateStatus()))
+			this.unsubscribers.push(
+				this.webrtc.subscribeStatus((status) => {
+					this.handleWebRTCStatus(status)
+					this.updateStatus()
+				}),
+			)
 		}
 
 		this.updateStatus()
@@ -73,6 +85,7 @@ export class HybridTransport implements CollabTransport {
 		this.statusEmitter.clear()
 		this.syncedEmitter.clear()
 		this.status = 'disconnected'
+		this.clearFallbackTimer()
 	}
 
 	getStatus(): TransportStatus {
@@ -85,6 +98,16 @@ export class HybridTransport implements CollabTransport {
 
 	subscribeSynced(listener: () => void): () => void {
 		return this.syncedEmitter.subscribe(listener)
+	}
+
+	getChildStatuses(): { kind: TransportKind; status: TransportStatus }[] {
+		const statuses: { kind: TransportKind; status: TransportStatus }[] = [
+			{ kind: 'hocuspocus', status: this.hocuspocus.getStatus() },
+		]
+		if (this.webrtc) {
+			statuses.push({ kind: 'webrtc', status: this.webrtc.getStatus() })
+		}
+		return statuses
 	}
 
 	private updateStatus() {
@@ -111,5 +134,45 @@ export class HybridTransport implements CollabTransport {
 			this.status = next
 			this.statusEmitter.emit(this.status)
 		}
+	}
+
+	private handleWebRTCStatus(status: TransportStatus) {
+		if (!this.webrtc) {
+			return
+		}
+		if (status === 'connected') {
+			this.clearFallbackTimer()
+			return
+		}
+		if (status === 'error' || status === 'disconnected') {
+			this.scheduleFallback()
+		}
+	}
+
+	private scheduleFallback() {
+		if (this.webrtcFallbackTimer || !this.webrtc) {
+			return
+		}
+		this.webrtcFallbackTimer = setTimeout(() => {
+			this.disableWebRTC()
+		}, 5000)
+	}
+
+	private clearFallbackTimer() {
+		if (this.webrtcFallbackTimer) {
+			clearTimeout(this.webrtcFallbackTimer)
+			this.webrtcFallbackTimer = null
+		}
+	}
+
+	private disableWebRTC() {
+		if (!this.webrtc) {
+			return
+		}
+		this.webrtc.disconnect()
+		this.webrtc.destroy()
+		this.webrtc = undefined
+		this.clearFallbackTimer()
+		this.updateStatus()
 	}
 }

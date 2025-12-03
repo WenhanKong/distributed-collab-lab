@@ -206,10 +206,19 @@ export class CollabProvider {
 	}
 
 	private refreshSnapshot() {
-		const transportStates: TransportState[] = this.transports.map((transport) => ({
-			kind: transport.kind,
-			status: transport.getStatus(),
-		}))
+		const transportStates: TransportState[] = this.transports.flatMap((transport) => {
+			const hybridStatuses =
+				(transport as unknown as { getChildStatuses?: () => TransportState[] }).getChildStatuses?.() ?? []
+			if (hybridStatuses.length > 0) {
+				return hybridStatuses
+			}
+			return [
+				{
+					kind: transport.kind,
+					status: transport.getStatus(),
+				},
+			]
+		})
 
 		const statuses = transportStates.map((state) => state.status)
 

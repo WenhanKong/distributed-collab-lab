@@ -72,11 +72,20 @@ export function RoomShell({ room, user, serverUrl, signalingUrls, onLeave }: Roo
                 </div>
                 <div className="roomShell__meta">
                     <div className="roomShell__transports">
-                        {transports.map((transport) => (
-                            <span key={transport.kind} className={`transport transport--${transport.status}`}>
-                                {transport.kind}
-                            </span>
-                        ))}
+                        {transports.map((transport, index) => {
+                            const label =
+                                transport.kind === 'hocuspocus'
+                                    ? 'WebSockets'
+                                    : transport.kind === 'webrtc'
+                                      ? 'WebRTC'
+                                      : 'Hybrid'
+                            return (
+                                <div key={`${transport.kind}-${transport.status}-${index}`} className="transport transport--stacked">
+                                    <span className={`transport__dot transport__dot--${transport.status}`} aria-hidden="true" />
+                                    <span className="transport__label">{label}</span>
+                                </div>
+                            )
+                        })}
                     </div>
                     <button type="button" className="roomShell__leave" onClick={onLeave}>
                         Leave room
